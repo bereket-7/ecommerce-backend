@@ -1,0 +1,22 @@
+// KitchenEdge API — placeholder schema (models added in catalog phase)
+// Future shapes align with ecommerce-template src/types/product.ts
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Example future models (uncomment when implementing catalog):
+//
+// model Product {
+//   id          String   @id @default(cuid())
+//   slug        String   @unique
+//   title       String
+//   priceCents  Int
+//   createdAt   DateTime @default(now())
+//   updatedAt   DateTime @updatedAt
+// }
