@@ -1,6 +1,6 @@
 # KitchenEdge API (`ecommerce-backend`)
 
-NestJS + Prisma + PostgreSQL backend for the [KitchenEdge storefront](../ecommerce-template) (Next.js). This repository is a **v1 skeleton**: health checks, database wiring, and dev tooling only. Catalog, orders, auth, and payments come in later phases.
+NestJS + Prisma + PostgreSQL backend for the [KitchenEdge storefront](../ecommerce-template) (Next.js).
 
 ## Stack
 
@@ -25,19 +25,18 @@ NestJS + Prisma + PostgreSQL backend for the [KitchenEdge storefront](../ecommer
    docker compose up -d
    ```
 
-   Wait until the `postgres` healthcheck passes (`docker compose ps`).
-
 2. **Environment**
 
    ```bash
    cp .env.example .env
    ```
 
-3. **Install & generate Prisma client**
+3. **Install, migrate, seed**
 
    ```bash
    npm install
-   npx prisma generate
+   npx prisma migrate deploy
+   npm run prisma:seed
    ```
 
 4. **Run the API (dev)**
@@ -46,31 +45,45 @@ NestJS + Prisma + PostgreSQL backend for the [KitchenEdge storefront](../ecommer
    npm run start:dev
    ```
 
-5. **Verify health**
-
-   Liveness (always 200 if the process is up):
+5. **Verify**
 
    ```bash
    curl http://localhost:4000/api/v1/health
+   curl http://localhost:4000/api/v1/products
    ```
 
-   Readiness (503 when Postgres is unreachable):
+   Swagger UI: [http://localhost:4000/api/docs](http://localhost:4000/api/docs)
 
-   ```bash
-   curl -i http://localhost:4000/api/v1/health/ready
-   ```
+## API surface
 
-   Example liveness response:
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/v1/health` | — | Liveness |
+| GET | `/api/v1/health/ready` | — | Readiness |
+| GET | `/api/v1/categories` | — | Shop categories |
+| GET | `/api/v1/products` | — | List/search/filter products |
+| GET | `/api/v1/products/facets` | — | Filter facet counts |
+| GET | `/api/v1/products/:slug` | — | Product detail |
+| GET | `/api/v1/products/:slug/reviews` | — | Product reviews |
+| POST | `/api/v1/products/:slug/reviews` | optional | Add review |
+| GET | `/api/v1/shipping/methods?subtotal=` | — | Shipping options + prices |
+| POST | `/api/v1/orders` | optional | Create order |
+| GET | `/api/v1/orders` | JWT | List user orders |
+| GET | `/api/v1/orders/:id` | optional | Order detail |
+| PATCH | `/api/v1/orders/:id/status` | — | Update order status |
+| POST | `/api/v1/auth/register` | — | Register |
+| POST | `/api/v1/auth/login` | — | Login (JWT) |
+| GET | `/api/v1/auth/me` | JWT | Profile |
+| GET/POST/PATCH/DELETE | `/api/v1/addresses` | JWT | Address book |
+| GET/POST/DELETE | `/api/v1/wishlist` | JWT | Wishlist |
+| POST | `/api/v1/coupons/validate` | — | Validate coupon |
+| POST | `/api/v1/contact` | — | Contact form |
+| POST | `/api/v1/newsletter/subscribe` | — | Newsletter |
+| POST | `/api/v1/payments/initiate` | — | Stub Telebirr/CBE redirect |
+| POST | `/api/v1/payments/webhooks/telebirr` | — | Payment webhook stub |
+| POST | `/api/v1/payments/webhooks/cbe` | — | Payment webhook stub |
 
-   ```json
-   {
-     "status": "ok",
-     "timestamp": "2026-05-21T12:00:00.000Z",
-     "database": "up"
-   }
-   ```
-
-   If Postgres is not running, liveness still returns 200 with `"database": "down"`; readiness returns **503**.
+**Money:** prices are whole **ETB** integers (e.g. `8500`), matching the frontend catalog.
 
 ## Scripts
 
@@ -79,69 +92,29 @@ NestJS + Prisma + PostgreSQL backend for the [KitchenEdge storefront](../ecommer
 | `npm run start:dev` | Watch mode (port from `PORT`, default 4000) |
 | `npm run build` | Compile to `dist/` |
 | `npm run start:prod` | Run compiled app |
-| `npm run lint` | ESLint |
-| `npm run test` | Unit tests |
-| `npm run test:e2e` | E2E tests (health endpoint) |
-| `npm run prisma:generate` | Generate Prisma client |
 | `npm run prisma:migrate` | Run migrations (`prisma migrate dev`) |
-| `npm run prisma:studio` | Prisma Studio UI |
+| `npm run prisma:seed` | Seed categories, products, ADDIS25 coupon |
+| `npm run test:e2e` | E2E tests |
 
-## API surface (v1)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/v1/health` | Liveness (always 200; includes DB status) |
-| GET | `/api/v1/health/ready` | Readiness (503 if DB is down) |
-| GET | `/api/docs` | Swagger UI |
-
-### Environment
+## Environment
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_URL` | (see `.env.example`) | PostgreSQL connection string |
+| `DATABASE_URL` | (see `.env.example`) | PostgreSQL connection |
 | `PORT` | `4000` | HTTP port |
-| `CORS_ORIGIN` | `http://localhost:3000` | Allowed origin(s), comma-separated |
+| `CORS_ORIGIN` | `http://localhost:3000` | Allowed origin(s) |
+| `JWT_SECRET` | — | JWT signing secret |
+| `JWT_EXPIRES_IN` | `7d` | JWT expiry |
+| `SHIPPING_FREE_THRESHOLD` | `4000` | Free Addis standard shipping (ETB) |
 | `NODE_ENV` | `development` | Runtime environment |
 
-## Frontend integration (future)
-
-The Next.js app lives in [`ecommerce-template`](../ecommerce-template). When wired, use:
+## Frontend integration
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
 ```
 
-| Frontend today | Future backend |
-|----------------|----------------|
-| `src/components/Shop/shopData.ts` | `GET /api/v1/products` |
-| `src/app/(site)/(pages)/products/[slug]/page.tsx` | `GET /api/v1/products/:slug` |
-| Redux cart + checkout | `POST /api/v1/orders` |
-| `src/lib/siteConfig.ts` (ETB, shipping) | Config service or API env |
-
-**Money convention (planned):** ETB as integers (santim) or whole ETB with a documented API convention.
-
-## Roadmap
-
-1. **Catalog** — Prisma models, seed from `shopData`, products REST, Next.js fetch
-2. **Orders** — `POST /orders`, shipping rules from `shippingOptions.ts`
-3. **Auth** — JWT, addresses, order history
-4. **Payments** — Telebirr / CBE webhooks, COD order state
-
-**Phase 2 (not in v1):** Redis (sessions/cache), object storage, email, payment provider SDKs.
-
-## Project layout
-
-```
-src/
-├── main.ts              # Bootstrap entry
-├── create-app.ts        # Shared app setup (CORS, prefix, Swagger)
-├── app.module.ts
-├── config/configuration.ts
-├── prisma/              # PrismaModule + PrismaService
-└── health/              # GET /api/v1/health
-prisma/schema.prisma     # Placeholder (no models yet)
-docker-compose.yml       # PostgreSQL 16
-```
+Use `Authorization: Bearer <token>` for protected routes.
 
 ## License
 
