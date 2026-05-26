@@ -25,6 +25,10 @@ class EnvironmentVariables {
 
   @IsIn(['development', 'production', 'test'])
   NODE_ENV!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  JWT_SECRET!: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {
@@ -33,6 +37,7 @@ export function validateEnv(config: Record<string, unknown>) {
     PORT: config.PORT ?? '4000',
     CORS_ORIGIN: config.CORS_ORIGIN ?? 'http://localhost:3000',
     NODE_ENV: config.NODE_ENV ?? 'development',
+    JWT_SECRET: config.JWT_SECRET ?? 'dev-jwt-secret-change-in-production',
   };
 
   const validated = plainToInstance(EnvironmentVariables, normalized, {
