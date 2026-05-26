@@ -48,11 +48,19 @@ NestJS + Prisma + PostgreSQL backend for the [KitchenEdge storefront](../ecommer
 
 5. **Verify health**
 
+   Liveness (always 200 if the process is up):
+
    ```bash
    curl http://localhost:4000/api/v1/health
    ```
 
-   Example response:
+   Readiness (503 when Postgres is unreachable):
+
+   ```bash
+   curl -i http://localhost:4000/api/v1/health/ready
+   ```
+
+   Example liveness response:
 
    ```json
    {
@@ -62,7 +70,7 @@ NestJS + Prisma + PostgreSQL backend for the [KitchenEdge storefront](../ecommer
    }
    ```
 
-   If Postgres is not running, `database` will be `"down"` while `status` remains `"ok"`.
+   If Postgres is not running, liveness still returns 200 with `"database": "down"`; readiness returns **503**.
 
 ## Scripts
 
@@ -82,7 +90,8 @@ NestJS + Prisma + PostgreSQL backend for the [KitchenEdge storefront](../ecommer
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/v1/health` | Liveness + DB ping |
+| GET | `/api/v1/health` | Liveness (always 200; includes DB status) |
+| GET | `/api/v1/health/ready` | Readiness (503 if DB is down) |
 | GET | `/api/docs` | Swagger UI |
 
 ### Environment
@@ -124,7 +133,8 @@ NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
 
 ```
 src/
-├── main.ts              # Bootstrap, CORS, prefix, Swagger
+├── main.ts              # Bootstrap entry
+├── create-app.ts        # Shared app setup (CORS, prefix, Swagger)
 ├── app.module.ts
 ├── config/configuration.ts
 ├── prisma/              # PrismaModule + PrismaService

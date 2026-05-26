@@ -1,30 +1,18 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { App } from 'supertest/types';
-import { AppModule } from '../src/app.module';
+import { createApp } from '../src/create-app';
+import type { HealthResponse } from '../src/health/health.types';
 
 describe('Health (e2e)', () => {
-  let app: INestApplication<App>;
+  let app: INestApplication;
 
   beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api/v1');
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        transform: true,
-      }),
-    );
+    app = await createApp();
     await app.init();
   });
 
   afterEach(async () => {
-    await app.close();
+    await app?.close();
   });
 
   it('GET /api/v1/health returns 200 with status ok', () => {
@@ -32,9 +20,27 @@ describe('Health (e2e)', () => {
       .get('/api/v1/health')
       .expect(200)
       .expect((res) => {
-        expect(res.body.status).toBe('ok');
-        expect(res.body.timestamp).toBeDefined();
-        expect(['up', 'down']).toContain(res.body.database);
+        const body = res.body as HealthResponse;
+        expect(body.status).toBe('ok');
+        expect(body.timestamp).toBeDefined();
+        expect(['up', 'down']).toContain(body.database);
       });
+  });
+
+  it('GET /api/v1/health/ready returns 200 or 503 based on database', async () => {
+    const liveRes = await request(app.getHttpServer()).get('/api/v1/health');
+    const body = liveRes.body as HealthResponse;
+
+    const readyReq = request(app.getHttpServer()).get('/api/v1/health/ready');
+
+    if (body.database === 'up') {
+      await readyReq.expect(200).expect((res) => {
+        const ready = res.body as HealthResponse;
+        expect(ready.status).toBe('ok');
+        expect(ready.database).toBe('up');
+      });
+    } else {
+      await readyReq.expect(503);
+    }
   });
 });
