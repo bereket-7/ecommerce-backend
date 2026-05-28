@@ -18,7 +18,8 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrdersService } from './orders.service';
 
-type AuthRequest = Request & { user?: { userId: string } };
+type OptionalAuthRequest = Request & { user?: { userId: string } };
+type AuthRequest = Request & { user: { userId: string } };
 
 @ApiTags('orders')
 @Controller('orders')
@@ -30,7 +31,7 @@ export class OrdersController {
   @UseGuards(OptionalJwtAuthGuard)
   @ApiBearerAuth()
   @ApiOkResponse({ description: 'Create a new order' })
-  create(@Body() dto: CreateOrderDto, @Req() req: AuthRequest) {
+  create(@Body() dto: CreateOrderDto, @Req() req: OptionalAuthRequest) {
     return this.ordersService.create(dto, req.user?.userId);
   }
 
@@ -38,19 +39,25 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   findAll(@Req() req: AuthRequest) {
-    return this.ordersService.findAll(req.user!.userId);
+    return this.ordersService.findAll(req.user.userId);
   }
 
   @Get(':id')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   findOne(@Param('id') id: string, @Req() req: AuthRequest) {
-    return this.ordersService.findOne(id, req.user?.userId);
+    return this.ordersService.findOne(id, req.user.userId);
   }
 
   @Patch(':id/status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOkResponse({ description: 'Update order status' })
-  updateStatus(@Param('id') id: string, @Body() dto: UpdateOrderStatusDto) {
-    return this.ordersService.updateStatus(id, dto);
+  updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateOrderStatusDto,
+    @Req() req: AuthRequest,
+  ) {
+    return this.ordersService.updateStatus(id, dto, req.user.userId);
   }
 }
