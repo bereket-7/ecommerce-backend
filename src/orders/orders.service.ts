@@ -163,9 +163,9 @@ export class OrdersService {
     return orders.map((o) => this.toOrderListItem(o));
   }
 
-  async findOne(id: string, userId?: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
+  async findOne(id: string, userId: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { id, userId },
       include: { lines: true, addresses: true },
     });
 
@@ -173,14 +173,27 @@ export class OrdersService {
       throw new NotFoundException('Order not found');
     }
 
-    if (userId && order.userId !== userId) {
-      throw new NotFoundException('Order not found');
-    }
-
     return this.toOrderResponse(order);
   }
 
-  async updateStatus(id: string, dto: UpdateOrderStatusDto) {
+  async updateStatus(id: string, dto: UpdateOrderStatusDto, userId: string) {
+    if (dto.status !== OrderStatus.cancelled) {
+      throw new BadRequestException('Customers can only cancel orders');
+    }
+
+    const existing = await this.prisma.order.findFirst({
+      where: { id, userId },
+      select: { id: true, status: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (existing.status === OrderStatus.delivered) {
+      throw new BadRequestException('Delivered orders cannot be cancelled');
+    }
+
     const order = await this.prisma.order.update({
       where: { id },
       data: { status: dto.status },
