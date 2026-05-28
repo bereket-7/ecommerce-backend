@@ -18,6 +18,10 @@ type CouponValidation = {
   discountAmount: number;
 };
 
+type AuthResponse = {
+  accessToken: string;
+};
+
 describe('Orders (e2e)', () => {
   let app: INestApplication;
   let dbUp = false;
@@ -82,5 +86,75 @@ describe('Orders (e2e)', () => {
     const body = res.body as CouponValidation;
     expect(body.valid).toBe(true);
     expect(body.discountAmount).toBe(2500);
+  });
+
+  it('protects order detail and status update with JWT', async () => {
+    if (!dbUp) {
+      return;
+    }
+
+    await request(app.getHttpServer())
+      .get('/api/v1/orders/order-id')
+      .expect(401);
+
+    await request(app.getHttpServer())
+      .patch('/api/v1/orders/order-id/status')
+      .send({ status: 'cancelled' })
+      .expect(401);
+  });
+
+  it('allows owner to cancel their own order only', async () => {
+    if (!dbUp) {
+      return;
+    }
+
+    const email = `orders-${Date.now()}@kitchenedge.test`;
+
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({
+        email,
+        password: 'password123',
+        name: 'Orders User',
+      })
+      .expect(201);
+
+    const loginRes = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ email, password: 'password123' })
+      .expect(201);
+
+    const loginBody = loginRes.body as AuthResponse;
+
+    const orderRes = await request(app.getHttpServer())
+      .post('/api/v1/orders')
+      .set('Authorization', `Bearer ${loginBody.accessToken}`)
+      .send({
+        lines: [{ productId: 1, quantity: 1 }],
+        billing: {
+          name: 'Orders User',
+          phone: '+251911000001',
+          email,
+          city: 'Addis Ababa',
+          street: 'Bole Road',
+        },
+        shippingMethodId: 'addis-standard',
+        paymentMethod: 'cash',
+      })
+      .expect(201);
+
+    const created = orderRes.body as { id: string };
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/orders/${created.id}/status`)
+      .set('Authorization', `Bearer ${loginBody.accessToken}`)
+      .send({ status: 'cancelled' })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/orders/${created.id}/status`)
+      .set('Authorization', `Bearer ${loginBody.accessToken}`)
+      .send({ status: 'delivered' })
+      .expect(400);
   });
 });
