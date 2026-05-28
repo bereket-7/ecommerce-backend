@@ -30,6 +30,8 @@ jobs:
       PORT: '4000'
       CORS_ORIGIN: http://localhost:3000
       NODE_ENV: test
+      JWT_SECRET: ci-test-jwt-secret
+      SHIPPING_FREE_THRESHOLD: '4000'
 
     steps:
       - uses: actions/checkout@v4
@@ -40,6 +42,10 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      - run: npx prisma migrate deploy
+
+      - run: npm run prisma:seed
 
       - run: npm run lint
 

@@ -33,6 +33,7 @@ export async function createApp(): Promise<INestApplication> {
     .setTitle('KitchenEdge API')
     .setDescription('KitchenEdge e-commerce backend')
     .setVersion('0.1.0')
+    .addBearerAuth()
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
